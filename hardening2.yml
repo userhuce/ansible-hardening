@@ -1,17 +1,245 @@
----
-- name: Crear usuario huamani en el servidor FTP
-  hosts: servidor_ftp
+- name: Hardening servidor web SSH
+  hosts: SRV-WEB
+  remote_user: sysadmin
   become: yes
-  
-  tasks:
-    - name: Crear usuario huamani
-      user:
-        name: huamani
-        state: present
-      become: yes
 
-    - name: Asignar contraseña al usuario huamani
-      user:
-        name: huamani
-        password: "{{ 'contraseña_encriptada' | password_hash('sha512') }}"
-      become: yes
+  tasks:
+    - name: Actualizar los repositorios
+      apt:
+        update_cache: yes
+
+    - name: Hace upgrade a las aplicaciones instaladas
+      apt:
+        upgrade: dist
+
+    - name: Asegurarse que el ssh este instalado
+      apt:
+        name: openssh-server
+        state: present
+
+    - name: Cambio de Puerto al SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port'
+        line: 'Port 2222'
+        state: present
+
+    - name: Deshabilitar el logeo por contraseña
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+
+
+
+
+    - name: Desabilitar el logeo de root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+
+    - name: Activar los log de SSH en modo VERBOSE
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LogLevel'
+        line: 'LogLevel VERBOSE'
+        state: present
+
+    - name: Permitir maximo 3 logeos
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries'
+        line: 'MaxAuthTries 3'
+        state: present
+
+    - name: Reiniciamos servicio
+      service:
+        name: ssh
+        state: restarted
+
+    - name: Poner politica de expiración de contraseña(login.defs)
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_MAX_DAYS'
+        line: 'PASS_MAX_DAYS   30'
+        state: present
+
+    - name: Poner minimo de dias entre los cambios de contraseña
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_MIN_DAYS'
+        line: 'PASS_MIN_DAYS   7'
+        state: present
+
+    - name: Poner un advertencia de expiración de contraseña
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_WARN_AGE'
+        line: 'PASS_WARN_AGE   14'
+        state: present
+
+    - name: Poner cantidad maximo de fallos de logeos por IP
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?max_per_ip'
+        line: 'max_per_ip=3'
+        state: present
+
+    - name: Poner maximo fallos por login
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?max_login_fails'
+        line: 'max_login_fails=3'
+        state: present
+
+
+
+
+- name: Hardening servidor FTP
+  hosts: SRV-FTP
+  remote_user: sysadmin
+  become: yes
+  tasks:
+    - name: Actualizar los repositorios
+      apt:
+        update_cache: yes
+
+    - name: Hace upgrade a las aplicaciones instaladas
+      apt:
+        upgrade: dist
+
+    - name: Instalar FTP vsftpd
+      apt:
+        name: vsftpd
+        state: present
+
+    - name: Configurar vsftpd -  deshabilitamos el logeo anónimo
+      lineinfile:
+        path: /etc/vsftpd.conf
+        regexp: '^#?anonymous_enable'
+        line: 'anonymous_enable=NO'
+        state: present
+
+    - name: Configurar vsftpd -  habilita usuarios locales
+      lineinfile:
+        path: /etc/vsftpd.conf
+        regexp: '^#?local_enable'
+        line: 'local_enable=YES'
+        state: present
+
+    - name: Configurar vsftpd – Habilita escritura
+      lineinfile:
+        path: /etc/vsftpd.conf
+        regexp: '^#?write_enable'
+        line: 'write_enable=YES'
+        state: present
+
+    - name: Crea un directorio FTP
+      file:
+        path: /home/sysadmin/ftp
+        state: directory
+        owner: sysadmin
+        group: sysadminone
+
+    - name: Configura la carpeta creada en el usuario paul
+      lineinfile:
+        path: /etc/vsftpd.conf
+        regexp: '^#?local_root'
+        line: 'local_root=/home/sysadmin/ftp'
+        state: present
+
+    - name: Reiniciar el servicio vsftpd
+      service:
+        name: vsftpd
+        state: restarted
+
+    - name: Permitir FTP a través del firewall
+      ufw:
+        rule: allow
+        port: 21
+        proto: tcp
+
+    - name: Poner politica de expiración de contraseña(login.defs)
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_MAX_DAYS'
+        line: 'PASS_MAX_DAYS   30'
+        state: present
+
+    - name: Poner minimo de dias entre los cambios de contraseña
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_MIN_DAYS'
+        line: 'PASS_MIN_DAYS   7'
+        state: present
+
+    - name: Poner un advertencia de expiración de contraseña
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?PASS_WARN_AGE'
+        line: 'PASS_WARN_AGE   14'
+        state: present
+
+    - name: Asegurarse que el ssh este instalado
+      apt:
+        name: openssh-server
+        state: present
+
+    - name: Cambio de Puerto al SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port'
+        line: 'Port 2222'
+        state: present
+
+    - name: Deshabilitar el puerto por defecto
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+
+
+
+
+    - name: Desabilitar el logeo de root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+
+    - name: Activar los log de SSH en modo VERBOSE
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LogLevel'
+        line: 'LogLevel VERBOSE'
+        state: present
+
+    - name: Permitir maximo 3 logeos
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries'
+        line: 'MaxAuthTries 3'
+        state: present
+
+    - name: Reiniciamos servicio
+      service:
+        name: ssh
+        state: restarted
+    - name: Poner cantidad maximo de fallos de logeos por IP
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?max_per_ip'
+        line: 'max_per_ip=3'
+        state: present
+
+    - name: Poner maximo fallos por login
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^#?max_login_fails'
+        line: 'max_login_fails=3'
+        state: present
